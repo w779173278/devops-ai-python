@@ -6,9 +6,12 @@ from datetime import datetime
 from typing import Any
 
 from deepagents import create_deep_agent
+from deepagents.backends import FilesystemBackend
 from deepagents.middleware.subagents import SubAgent
+from langchain.agents.middleware import InterruptOnConfig
 from langchain.chat_models import init_chat_model
 from langchain.tools import tool
+from langgraph.checkpoint.memory import MemorySaver
 
 ORCHESTRATOR_PROMPT = """
 你是 DevOps 主脑 Agent，负责规划→确认→调度子 Agent→汇总报告。
@@ -36,6 +39,9 @@ LOG_AGENT_PROMPT = """
 输入至少包含：service、environment、window_minutes、limit（样例条数）。
 输出包含：关键模式/计数、典型日志样例、可疑时间段。
 缺少必要参数时直接报错说明缺口，不要臆测。
+IMPORTANT: Return only the essential summary.
+Do NOT include raw data, intermediate search results, or detailed tool outputs.
+Your response should be under 500 words
 """
 
 METRIC_AGENT_PROMPT = """
@@ -43,6 +49,9 @@ METRIC_AGENT_PROMPT = """
 关注：error_rate、latency_p99_ms、cpu_percent、qps。
 输出包含：峰值与基线、开始时间、异常描述、建议观察项。
 缺少 service/environment/window_minutes 时直接说明缺口。
+IMPORTANT: Return only the essential summary.
+Do NOT include raw data, intermediate search results, or detailed tool outputs.
+Your response should be under 500 words
 """
 
 CODE_AGENT_PROMPT = """
@@ -50,15 +59,18 @@ CODE_AGENT_PROMPT = """
 输入至少包含 service；可选 branch、recent_commits。
 输出包含：提交哈希、标题、涉及模块、风险提示。
 若缺少 service，直接说明缺口。
+IMPORTANT: Return only the essential summary.
+Do NOT include raw data, intermediate search results, or detailed tool outputs.
+Your response should be under 500 words
 """
 
 
 @tool("collect_logs")
 def collect_logs(
-    service: str,
-    environment: str,
-    window_minutes: int = 30,
-    limit: int = 30,
+        service: str,
+        environment: str,
+        window_minutes: int = 30,
+        limit: int = 30,
 ) -> dict[str, Any]:
     """日志采集工具（示例数据）。"""
     return {
@@ -80,9 +92,9 @@ def collect_logs(
 
 @tool("collect_prom_metrics")
 def collect_prom_metrics(
-    service: str,
-    environment: str,
-    window_minutes: int = 30,
+        service: str,
+        environment: str,
+        window_minutes: int = 30,
 ) -> dict[str, Any]:
     """Prometheus 采集工具（示例数据）。"""
     return {
@@ -100,9 +112,9 @@ def collect_prom_metrics(
 
 @tool("collect_code_changes")
 def collect_code_changes(
-    service: str,
-    branch: str = "main",
-    recent_commits: int = 3,
+        service: str,
+        branch: str = "main",
+        recent_commits: int = 3,
 ) -> dict[str, Any]:
     """代码采集工具（示例数据）。"""
     return {
@@ -128,9 +140,10 @@ def collect_code_changes(
             "近 2 次提交涉及 api-gateway 调用与异常处理，建议与日志/指标交叉验证。",
         ],
     }
-"""创建一个包含主脑/子 Agent 调度的深度代理。"""
+
+
 chat_model = init_chat_model(
-    model= "deepseek-chat",
+    model="deepseek-chat",
     model_provider="deepseek",
 )
 
@@ -158,14 +171,19 @@ SUBAGENTS: list[SubAgent] = [
     },
 ]
 
+# Checkpointer is REQUIRED for human-in-the-loop
+checkpointer = MemorySaver()
 
 def build_devops_agent(model: str | None = None):
+    """创建一个包含主脑/子 Agent 调度的深度代理。"""
     return create_deep_agent(
         model=chat_model,
         system_prompt=ORCHESTRATOR_PROMPT.format(datetime.now()),
         subagents=SUBAGENTS,
         interrupt_on={
-            "collect_logs": True,
+            "collect_logs": InterruptOnConfig(allowed_decisions=["approve", "reject"]),
         },
         debug=False,
+        backend=FilesystemBackend(root_dir=".", virtual_mode=True),
+        checkpointer=checkpointer,
     )
