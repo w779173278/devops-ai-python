@@ -91,40 +91,45 @@ flowchart TB
 
 ## 五、Skills 目录设计
 
+### 全局 Agent 配置
+
 ```
 ~/.deepagents/devops-agent/
-  skills/
-    plan-negotiation/
-      [SKILL.md](http://SKILL.md)
-      templates/
-        plan.schema.json
-        [confirm.phrases.md](http://confirm.phrases.md)
-    elk-log-analysis/
-      [SKILL.md](http://SKILL.md)
-      scripts/
-        elk_[query.py](http://query.py)
-      resources/
-        query_[patterns.md](http://patterns.md)
-    prom-metric-diagnosis/
-      [SKILL.md](http://SKILL.md)
-      resources/
-        promql_[templates.md](http://templates.md)
-    execution-dryrun/
-      [SKILL.md](http://SKILL.md)
-      scripts/
-        safe_[kubectl.sh](http://kubectl.sh)
-      resources/
-        [allowlist.md](http://allowlist.md)
-        risk_[matrix.md](http://matrix.md)
-    rollback-playbooks/
-      [SKILL.md](http://SKILL.md)
-      playbooks/
-        nginx_[reload.md](http://reload.md)
-        pod_[restart.md](http://restart.md)
-    post-fix-observability/
-      [SKILL.md](http://SKILL.md)
-      resources/
-        slo_[gate.md](http://gate.md)
+├── [agent.md](http://agent.md)              # 全局 personality/style（自动加载）
+└── skills/
+    ├── plan-negotiation/
+    │   └── [SKILL.md](http://SKILL.md)
+    ├── elk-log-analysis/
+    │   ├── [SKILL.md](http://SKILL.md)
+    │   └── scripts/
+    │       └── elk_[query.py](http://query.py)
+    ├── prom-metric-diagnosis/
+    │   ├── [SKILL.md](http://SKILL.md)
+    │   └── resources/
+    │       └── promql_[templates.md](http://templates.md)
+    ├── execution-dryrun/
+    │   ├── [SKILL.md](http://SKILL.md)
+    │   └── scripts/
+    │       └── safe_[kubectl.sh](http://kubectl.sh)
+    ├── rollback-playbooks/
+    │   ├── [SKILL.md](http://SKILL.md)
+    │   └── playbooks/
+    │       ├── nginx_[reload.md](http://reload.md)
+    │       └── pod_[restart.md](http://restart.md)
+    └── post-fix-observability/
+        ├── [SKILL.md](http://SKILL.md)
+        └── resources/
+            └── slo_[gate.md](http://gate.md)
+```
+
+### 项目级配置（可提交到 Git）
+
+```
+my-project/
+├── .git/
+└── .deepagents/
+    ├── [agent.md](http://agent.md)          # 项目专属指令
+    └── skills/           # 项目专属 skills
 ```
 
 ### [SKILL.md](http://SKILL.md) 示例
@@ -184,7 +189,7 @@ gantt
 
 | 任务 | 预估工时 | 交付物 |
 | --- | --- | --- |
-| **DeepAgents 环境搭建** | 2d | deepagents==0.3.0 安装、CLI 配置、本地验证 |
+| **DeepAgents 环境搭建** | 2d | `pip install deepagents-cli`、`deepagents create devops-agent`、本地验证 |
 | **devops-agent 初始化** | 1d | agent 目录结构、skills 目录、memories 配置 |
 | **plan-negotiation skill** | 3d | [SKILL.md](http://SKILL.md) + plan.schema.json + [confirm.phrases.md](http://confirm.phrases.md) |
 | **log-analyst sub-agent** | 4d | ELK 查询工具、elk-log-analysis skill、摘要输出 |
@@ -295,25 +300,43 @@ gantt
 
 ### 步骤
 
-1. **初始化 devops-agent**
+1. **安装 deepagents-cli**
 
     ```bash
-    pip install deepagents==0.3.0
-    deepagents init devops-agent
+    # 推荐使用 uv
+    uv venv
+    uv pip install deepagents-cli
+    
+    # 或使用 pip
+    pip install deepagents-cli
     ```
 
-2. **添加 3 个 skills**
-   - `plan-negotiation/`
-   - `elk-log-analysis/`
-   - `prom-metric-diagnosis/`
-3. **注册 2 个 sub-agents**
-   - `log-analyst`（工具集：ELK 查询）
-   - `metric-analyst`（工具集：PromQL 查询）
+2. **创建 devops-agent**
+
+    ```bash
+    deepagents create devops-agent
+    ```
+
+3. **添加 skills**
+
+    ```bash
+    # 创建 skills
+    deepagents skills create plan-negotiation --agent devops-agent
+    deepagents skills create elk-log-analysis --agent devops-agent
+    deepagents skills create prom-metric-diagnosis --agent devops-agent
+    
+    # 查看已有 skills
+    deepagents skills list --agent devops-agent
+    ```
+
 4. **CLI 本地验证**
 
     ```bash
-    cd your-project
-    deepagents run devops-agent
+    # 启动 agent
+    deepagents --agent devops-agent
+    
+    # 或使用 auto-approve 跳过确认（仅测试环境）
+    deepagents --agent devops-agent --auto-approve
     ```
 
 5. **接入 Java Gateway**
