@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "plan-negotiation",
+  "type": "object",
+  "properties": {
+    "service": { "type": "string", "description": "Target service or component" },
+    "environment": { "type": "string", "description": "Environment such as production/staging" },
+    "window_minutes": { "type": "integer", "minimum": 1, "description": "Time window in minutes" },
+    "include_logs": { "type": "boolean", "default": true },
+    "include_metrics": { "type": "boolean", "default": true },
+    "outputs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Expected outputs: summary, samples, causes, next steps"
+    }
+  },
+  "required": ["service", "environment", "window_minutes"]
+}
